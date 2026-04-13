@@ -1,28 +1,2 @@
 # Visual Studio
 .vs/
-
-# Build folders
-Debug/
-Release/
-x64/
-x86/
-ipch/
-[Bb]in/
-[Oo]bj/
-
-# C/C++ build artifacts
-*.obj
-*.o
-*.pdb
-*.ipdb
-*.iobj
-*.ilk
-*.idb
-*.exe
-*.dll
-*.lib
-*.exp
-
-# Logs/temp
-*.log
-*.tmp

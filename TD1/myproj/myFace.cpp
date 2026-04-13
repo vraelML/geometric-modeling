@@ -17,5 +17,14 @@ myFace::~myFace(void)
 
 void myFace::computeNormal()
 {
-/**** TODO ****/
+	if (adjacent_halfedge == NULL ||
+		adjacent_halfedge->next == NULL ||
+		adjacent_halfedge->next->next == NULL)
+		return;
+
+	myPoint3D *p1 = adjacent_halfedge->source->point;
+	myPoint3D *p2 = adjacent_halfedge->next->source->point;
+	myPoint3D *p3 = adjacent_halfedge->next->next->source->point;
+
+	normal->setNormal(p1, p2, p3);
 }
