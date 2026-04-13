@@ -52,6 +52,7 @@ bool drawwireframe = false;
 bool drawmeshvertices = false;
 bool drawsilhouette = false;
 bool drawnormals = false;
+bool prankMode = false;
 
 
 void makeBuffers(myMesh *input_mesh)
@@ -509,6 +510,10 @@ void keyboard(unsigned char key, int x, int y) {
 		exit(0);
 		break;
 	case 'm':
+		break;
+	case 'f':
+	case 'F':
+		prankMode = !prankMode;
 		break;
 	case 'h':
 		cout << "The keys for various algorithms are:\n";

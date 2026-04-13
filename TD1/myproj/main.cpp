@@ -357,7 +357,8 @@ void display()
 	draw_text(0.0f,22.0f, 0,"Halfedges: " + to_string(static_cast<long long>(m->halfedges.size())), color );
 	draw_text(0.0f,41.0f, 0,"Faces:       " + to_string(static_cast<long long>(m->faces.size())), color );
 	color[0] = 0.9f;
-	draw_text(Glut_w - 150.0f, Glut_h - 20.0f, 0, "FPS:       " + to_string(static_cast<long long>( fps)), color );
+	float shownFps = prankMode ? fps * 19.0f : fps;
+	draw_text(Glut_w - 150.0f, Glut_h - 20.0f, 0, "FPS:       " + to_string(static_cast<long long>(shownFps)), color );
 
 	glFlush();
 }
