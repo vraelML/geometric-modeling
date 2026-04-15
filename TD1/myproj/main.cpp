@@ -253,17 +253,44 @@ void display()
 		vector <GLuint> silhouette_edges;
 		for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 		{
-			/**** TODO: WRITE CODE TO COMPUTE SILHOUETTE ****/
 			myHalfedge *e = (*it);
-			myVertex *v1 = (*it)->source;
-			if ((*it)->twin == NULL) continue;
-			myVertex *v2 = (*it)->twin->source;
+			if (e == NULL || e->adjacent_face == NULL || e->adjacent_face->normal == NULL || e->source == NULL || e->source->point == NULL)
+				continue;
 
-			if ( 0 /*ADD THE CONDITION TO CHECK IF THE HALFEDGE DEFINED BY (V1, V2) IS A SILHOUETTE EDGE*/ )
+			myVertex *v1 = (*it)->source;
+			myVector3D view_to_camera(
+				camera_eye.X - v1->point->X,
+				camera_eye.Y - v1->point->Y,
+				camera_eye.Z - v1->point->Z
+			);
+			double d1 = *(e->adjacent_face->normal) * view_to_camera;
+			bool front_facing_1 = (d1 >= 0.0);
+
+			if (e->twin == NULL || e->twin->adjacent_face == NULL || e->twin->adjacent_face->normal == NULL)
 			{
-				silhouette_edges.push_back(v1->index);
-				silhouette_edges.push_back(v2->index);
-			}				
+				if (front_facing_1 && e->next != NULL && e->next->source != NULL)
+				{
+					silhouette_edges.push_back(v1->index);
+					silhouette_edges.push_back(e->next->source->index);
+				}
+				continue;
+			}
+
+			if (e < e->twin)
+			{
+				double d2 = *(e->twin->adjacent_face->normal) * view_to_camera;
+				bool front_facing_2 = (d2 >= 0.0);
+
+				if (front_facing_1 != front_facing_2)
+				{
+					myVertex *v2 = e->twin->source;
+					if (v2 != NULL)
+					{
+						silhouette_edges.push_back(v1->index);
+						silhouette_edges.push_back(v2->index);
+					}
+				}
+			}
 		}
 
 		GLuint silhouette_edges_buffer;

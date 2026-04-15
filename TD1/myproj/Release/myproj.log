@@ -2,11 +2,11 @@
 nfd.lib(nfd_win.obj) : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:ICF' specification
 LINK : warning LNK4098: defaultlib 'MSVCRTD' conflicts with use of other libs; use /NODEFAULTLIB:library
   Generating code
-  8 of 904 functions ( 0.9%) were compiled, the rest were copied from previous compilation.
+  16 of 904 functions ( 1.8%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
-    3 functions had inline decision re-evaluated but remain unchanged
+    12 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
 LINK : warning LNK4286: symbol '_sprintf_s' defined in 'MSVCRT.lib(error.obj)' is imported by 'nfd.lib(nfd_win.obj)'
 nfd.lib(nfd_common.obj) : warning LNK4099: PDB 'vc110.pdb' was not found with 'nfd.lib(nfd_common.obj)' or at 'C:\Users\Lilian\Documents\coding\ecole\geometric-modeling\TD1\Release\vc110.pdb'; linking object as if no debug info
-nfd.lib(nfd_win.obj) : warning LNK4099: PDB '' was not found with 'nfd.lib(nfd_win.obj)' or at ''; linking object as if no debug info
+nfd.lib(nfd_win.obj) : warning LNK4099: PDB 'vc110.pdb' was not found with 'nfd.lib(nfd_win.obj)' or at 'C:\Users\Lilian\Documents\coding\ecole\geometric-modeling\TD1\Release\vc110.pdb'; linking object as if no debug info
   myproj.vcxproj -> C:\Users\Lilian\Documents\coding\ecole\geometric-modeling\TD1\Release\myproj.exe
