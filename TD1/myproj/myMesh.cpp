@@ -4,10 +4,93 @@
 #include <sstream>
 #include <map>
 #include <utility>
+#include <algorithm>
 #include <GL/glew.h>
 #include "myvector3d.h"
 
 using namespace std;
+
+namespace {
+	vector<myVertex *> getFaceVertices(myFace *face)
+	{
+		vector<myVertex *> verts;
+		if (face == NULL || face->adjacent_halfedge == NULL) return verts;
+
+		myHalfedge *start = face->adjacent_halfedge;
+		myHalfedge *e = start;
+		do {
+			if (e == NULL || e->source == NULL) {
+				verts.clear();
+				return verts;
+			}
+			verts.push_back(e->source);
+			e = e->next;
+		} while (e != NULL && e != start);
+
+		if (e != start) verts.clear();
+		return verts;
+	}
+
+	void rebuildMeshFromPolygons(myMesh *mesh, const vector<vector<myVertex *>> &polygons)
+	{
+		vector<myHalfedge *> old_halfedges;
+		old_halfedges.swap(mesh->halfedges);
+		vector<myFace *> old_faces;
+		old_faces.swap(mesh->faces);
+
+		for (unsigned int i = 0; i < old_halfedges.size(); i++) if (old_halfedges[i]) delete old_halfedges[i];
+		for (unsigned int i = 0; i < old_faces.size(); i++) if (old_faces[i]) delete old_faces[i];
+
+		map<myVertex *, int> vertex_to_id;
+		for (unsigned int i = 0; i < mesh->vertices.size(); i++) {
+			mesh->vertices[i]->originof = NULL;
+			vertex_to_id[mesh->vertices[i]] = (int)i;
+		}
+
+		map<pair<int, int>, myHalfedge *> twin_map;
+		for (unsigned int i = 0; i < polygons.size(); i++)
+		{
+			const vector<myVertex *> &poly = polygons[i];
+			if (poly.size() < 3) continue;
+
+			myFace *f = new myFace();
+			mesh->faces.push_back(f);
+
+			vector<myHalfedge *> face_edges(poly.size(), NULL);
+			for (unsigned int j = 0; j < poly.size(); j++)
+			{
+				myHalfedge *h = new myHalfedge();
+				h->source = poly[j];
+				h->adjacent_face = f;
+				if (h->source->originof == NULL) h->source->originof = h;
+
+				mesh->halfedges.push_back(h);
+				face_edges[j] = h;
+			}
+
+			for (unsigned int j = 0; j < face_edges.size(); j++)
+			{
+				unsigned int next_id = (j + 1) % face_edges.size();
+				unsigned int prev_id = (j + face_edges.size() - 1) % face_edges.size();
+				face_edges[j]->next = face_edges[next_id];
+				face_edges[j]->prev = face_edges[prev_id];
+
+				int src = vertex_to_id[poly[j]];
+				int dst = vertex_to_id[poly[next_id]];
+				pair<int, int> edge_key(src, dst);
+				pair<int, int> opposite_key(dst, src);
+				map<pair<int, int>, myHalfedge *>::iterator it = twin_map.find(opposite_key);
+				if (it != twin_map.end()) {
+					face_edges[j]->twin = it->second;
+					it->second->twin = face_edges[j];
+				}
+				twin_map[edge_key] = face_edges[j];
+			}
+
+			f->adjacent_halfedge = face_edges[0];
+		}
+	}
+}
 
 myMesh::myMesh(void)
 {
@@ -207,13 +290,68 @@ void myMesh::subdivisionCatmullClark()
 
 void myMesh::triangulate()
 {
-	/**** TODO ****/
+	vector<vector<myVertex *>> polygons;
+	polygons.reserve(faces.size());
+
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		vector<myVertex *> verts = getFaceVertices(faces[i]);
+		if (verts.size() < 3) continue;
+
+		if (verts.size() == 3) {
+			polygons.push_back(verts);
+			continue;
+		}
+
+		for (unsigned int j = 1; j + 1 < verts.size(); j++)
+		{
+			vector<myVertex *> tri(3);
+			tri[0] = verts[0];
+			tri[1] = verts[j];
+			tri[2] = verts[j + 1];
+			polygons.push_back(tri);
+		}
+	}
+
+	rebuildMeshFromPolygons(this, polygons);
+	computeNormals();
 }
 
 //return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace *f)
 {
-	/**** TODO ****/
-	return false;
+	if (f == NULL) return false;
+
+	vector<myVertex *> target = getFaceVertices(f);
+	if (target.size() < 3) return false;
+	if (target.size() == 3) return false;
+
+	vector<vector<myVertex *>> polygons;
+	polygons.reserve(faces.size() + target.size());
+
+	for (unsigned int i = 0; i < faces.size(); i++)
+	{
+		myFace *curr = faces[i];
+		vector<myVertex *> verts = getFaceVertices(curr);
+		if (verts.size() < 3) continue;
+
+		if (curr != f) {
+			polygons.push_back(verts);
+			continue;
+		}
+
+		for (unsigned int j = 1; j + 1 < verts.size(); j++)
+		{
+			vector<myVertex *> tri(3);
+			tri[0] = verts[0];
+			tri[1] = verts[j];
+			tri[2] = verts[j + 1];
+			polygons.push_back(tri);
+		}
+	}
+
+	rebuildMeshFromPolygons(this, polygons);
+	computeNormals();
+	return true;
 }
 
