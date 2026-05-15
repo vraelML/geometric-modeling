@@ -31,6 +31,99 @@ namespace {
 		return verts;
 	}
 
+	bool isPointInTriangle(double px, double py, double ax, double ay, double bx, double by, double cx, double cy)
+	{
+		double c1 = (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+		double c2 = (cx - bx) * (py - by) - (cy - by) * (px - bx);
+		double c3 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx);
+		return (c1 >= -1e-9 && c2 >= -1e-9 && c3 >= -1e-9) || (c1 <= 1e-9 && c2 <= 1e-9 && c3 <= 1e-9);
+	}
+
+	vector<vector<myVertex*>> earClipPolygon(const vector<myVertex*>& verts, myVector3D N)
+	{
+		vector<vector<myVertex*>> tris;
+		int n = verts.size();
+		if (n < 3) return tris;
+		if (n == 3) {
+			tris.push_back(verts);
+			return tris;
+		}
+
+		myVector3D T;
+		if (abs(N.dX) < abs(N.dY) && abs(N.dX) < abs(N.dZ)) {
+			T = myVector3D(1.0, 0.0, 0.0);
+		} else if (abs(N.dY) < abs(N.dZ)) {
+			T = myVector3D(0.0, 1.0, 0.0);
+		} else {
+			T = myVector3D(0.0, 0.0, 1.0);
+		}
+		myVector3D U = T.crossproduct(N);
+		U.normalize();
+		myVector3D V = N.crossproduct(U);
+		V.normalize();
+
+		struct Point2D {
+			double x, y;
+			myVertex *orig;
+		};
+		vector<Point2D> pts(n);
+		for (int i = 0; i < n; i++) {
+			pts[i].x = verts[i]->point->X * U.dX + verts[i]->point->Y * U.dY + verts[i]->point->Z * U.dZ;
+			pts[i].y = verts[i]->point->X * V.dX + verts[i]->point->Y * V.dY + verts[i]->point->Z * V.dZ;
+			pts[i].orig = verts[i];
+		}
+
+		while (pts.size() > 3) {
+			bool ear_found = false;
+			int m = pts.size();
+			for (int i = 0; i < m; i++) {
+				int prev = (i - 1 + m) % m;
+				int next = (i + 1) % m;
+
+				double cross = (pts[i].x - pts[prev].x) * (pts[next].y - pts[i].y) - (pts[i].y - pts[prev].y) * (pts[next].x - pts[i].x);
+				if (cross <= 1e-9) continue;
+
+				bool has_point_inside = false;
+				for (int j = 0; j < m; j++) {
+					if (j == prev || j == i || j == next) continue;
+					if (isPointInTriangle(pts[j].x, pts[j].y, pts[prev].x, pts[prev].y, pts[i].x, pts[i].y, pts[next].x, pts[next].y)) {
+						has_point_inside = true;
+						break;
+					}
+				}
+
+				if (!has_point_inside) {
+					vector<myVertex*> tri(3);
+					tri[0] = pts[prev].orig;
+					tri[1] = pts[i].orig;
+					tri[2] = pts[next].orig;
+					tris.push_back(tri);
+					pts.erase(pts.begin() + i);
+					ear_found = true;
+					break;
+				}
+			}
+			if (!ear_found) break;
+		}
+
+		if (pts.size() == 3) {
+			vector<myVertex*> tri(3);
+			tri[0] = pts[0].orig;
+			tri[1] = pts[1].orig;
+			tri[2] = pts[2].orig;
+			tris.push_back(tri);
+		} else {
+			for (unsigned int j = 1; j + 1 < pts.size(); j++) {
+				vector<myVertex*> tri(3);
+				tri[0] = pts[0].orig;
+				tri[1] = pts[j].orig;
+				tri[2] = pts[j + 1].orig;
+				tris.push_back(tri);
+			}
+		}
+		return tris;
+	}
+
 	void rebuildMeshFromPolygons(myMesh *mesh, const vector<vector<myVertex *>> &polygons)
 	{
 		vector<myHalfedge *> old_halfedges;
@@ -303,21 +396,14 @@ void myMesh::triangulate()
 			continue;
 		}
 
-		for (unsigned int j = 1; j + 1 < verts.size(); j++)
-		{
-			vector<myVertex *> tri(3);
-			tri[0] = verts[0];
-			tri[1] = verts[j];
-			tri[2] = verts[j + 1];
-			polygons.push_back(tri);
-		}
+		vector<vector<myVertex*>> tris = earClipPolygon(verts, *(faces[i]->normal));
+		polygons.insert(polygons.end(), tris.begin(), tris.end());
 	}
 
 	rebuildMeshFromPolygons(this, polygons);
 	computeNormals();
 }
 
-//return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace *f)
 {
 	if (f == NULL) return false;
@@ -340,14 +426,8 @@ bool myMesh::triangulate(myFace *f)
 			continue;
 		}
 
-		for (unsigned int j = 1; j + 1 < verts.size(); j++)
-		{
-			vector<myVertex *> tri(3);
-			tri[0] = verts[0];
-			tri[1] = verts[j];
-			tri[2] = verts[j + 1];
-			polygons.push_back(tri);
-		}
+		vector<vector<myVertex*>> tris = earClipPolygon(verts, *(curr->normal));
+		polygons.insert(polygons.end(), tris.begin(), tris.end());
 	}
 
 	rebuildMeshFromPolygons(this, polygons);
