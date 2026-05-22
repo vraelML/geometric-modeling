@@ -377,7 +377,227 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 
 void myMesh::subdivisionCatmullClark()
 {
-	/**** TODO ****/
+	if (vertices.empty()) return;
+
+	vector<myPoint3D*> face_points(faces.size());
+	for (size_t i = 0; i < faces.size(); ++i) {
+		myFace* f = faces[i];
+		myHalfedge* start = f->adjacent_halfedge;
+		myHalfedge* h = start;
+		double sum_x = 0, sum_y = 0, sum_z = 0;
+		int count = 0;
+		do {
+			sum_x += h->source->point->X;
+			sum_y += h->source->point->Y;
+			sum_z += h->source->point->Z;
+			count++;
+			h = h->next;
+		} while (h != start);
+		face_points[i] = new myPoint3D(sum_x / count, sum_y / count, sum_z / count);
+	}
+
+	for (size_t i = 0; i < halfedges.size(); ++i) {
+		halfedges[i]->index = -1;
+	}
+
+	for (size_t i = 0; i < faces.size(); ++i) {
+		faces[i]->index = i;
+	}
+
+	for (size_t i = 0; i < vertices.size(); ++i) {
+		vertices[i]->index = i;
+	}
+
+	vector<myPoint3D*> edge_points;
+	int edge_count = 0;
+	for (size_t i = 0; i < halfedges.size(); ++i) {
+		myHalfedge* h = halfedges[i];
+		if (h->index != -1) continue;
+
+		h->index = edge_count;
+		if (h->twin) {
+			h->twin->index = edge_count;
+		}
+
+		myPoint3D* ep = new myPoint3D();
+		if (h->twin == NULL) {
+			ep->X = 0.5 * (h->source->point->X + h->next->source->point->X);
+			ep->Y = 0.5 * (h->source->point->Y + h->next->source->point->Y);
+			ep->Z = 0.5 * (h->source->point->Z + h->next->source->point->Z);
+		} else {
+			myPoint3D* f1 = face_points[h->adjacent_face->index];
+			myPoint3D* f2 = face_points[h->twin->adjacent_face->index];
+			ep->X = 0.25 * (h->source->point->X + h->next->source->point->X + f1->X + f2->X);
+			ep->Y = 0.25 * (h->source->point->Y + h->next->source->point->Y + f1->Y + f2->Y);
+			ep->Z = 0.25 * (h->source->point->Z + h->next->source->point->Z + f1->Z + f2->Z);
+		}
+		edge_points.push_back(ep);
+		edge_count++;
+	}
+
+	struct VertexInfo {
+		int valence;
+		double sum_face_x, sum_face_y, sum_face_z;
+		double sum_edge_mid_x, sum_edge_mid_y, sum_edge_mid_z;
+		bool is_boundary;
+		vector<myVertex*> boundary_neighbors;
+		VertexInfo() : valence(0), sum_face_x(0), sum_face_y(0), sum_face_z(0),
+			sum_edge_mid_x(0), sum_edge_mid_y(0), sum_edge_mid_z(0), is_boundary(false) {}
+	};
+	vector<VertexInfo> v_info(vertices.size());
+
+	for (size_t i = 0; i < faces.size(); ++i) {
+		myFace* f = faces[i];
+		myPoint3D* fp = face_points[i];
+		myHalfedge* start = f->adjacent_halfedge;
+		myHalfedge* h = start;
+		do {
+			int vi = h->source->index;
+			v_info[vi].sum_face_x += fp->X;
+			v_info[vi].sum_face_y += fp->Y;
+			v_info[vi].sum_face_z += fp->Z;
+			h = h->next;
+		} while (h != start);
+	}
+
+	vector<bool> edge_processed(edge_count, false);
+	for (size_t i = 0; i < halfedges.size(); ++i) {
+		myHalfedge* h = halfedges[i];
+		int idx = h->index;
+		if (edge_processed[idx]) continue;
+		edge_processed[idx] = true;
+
+		myVertex* v1 = h->source;
+		myVertex* v2 = h->next->source;
+
+		v_info[v1->index].valence++;
+		v_info[v2->index].valence++;
+
+		double mid_x = 0.5 * (v1->point->X + v2->point->X);
+		double mid_y = 0.5 * (v1->point->Y + v2->point->Y);
+		double mid_z = 0.5 * (v1->point->Z + v2->point->Z);
+
+		v_info[v1->index].sum_edge_mid_x += mid_x;
+		v_info[v1->index].sum_edge_mid_y += mid_y;
+		v_info[v1->index].sum_edge_mid_z += mid_z;
+
+		v_info[v2->index].sum_edge_mid_x += mid_x;
+		v_info[v2->index].sum_edge_mid_y += mid_y;
+		v_info[v2->index].sum_edge_mid_z += mid_z;
+
+		if (h->twin == NULL) {
+			v_info[v1->index].is_boundary = true;
+			v_info[v1->index].boundary_neighbors.push_back(v2);
+			v_info[v2->index].is_boundary = true;
+			v_info[v2->index].boundary_neighbors.push_back(v1);
+		}
+	}
+
+	vector<myVertex*> new_face_vertices(faces.size());
+	for (size_t i = 0; i < faces.size(); ++i) {
+		myVertex* nv = new myVertex();
+		nv->point = face_points[i];
+		new_face_vertices[i] = nv;
+	}
+
+	vector<myVertex*> new_edge_vertices(edge_count);
+	for (int i = 0; i < edge_count; ++i) {
+		myVertex* nv = new myVertex();
+		nv->point = edge_points[i];
+		new_edge_vertices[i] = nv;
+	}
+
+	vector<myVertex*> new_vertex_vertices(vertices.size());
+	for (size_t i = 0; i < vertices.size(); ++i) {
+		myVertex* v = vertices[i];
+		myVertex* nv = new myVertex();
+		myPoint3D* vp = new myPoint3D();
+		if (v_info[i].is_boundary && !v_info[i].boundary_neighbors.empty()) {
+			double b_sum_x = 0, b_sum_y = 0, b_sum_z = 0;
+			for (size_t j = 0; j < v_info[i].boundary_neighbors.size(); ++j) {
+				b_sum_x += v_info[i].boundary_neighbors[j]->point->X;
+				b_sum_y += v_info[i].boundary_neighbors[j]->point->Y;
+				b_sum_z += v_info[i].boundary_neighbors[j]->point->Z;
+			}
+			double num_b = v_info[i].boundary_neighbors.size();
+			vp->X = 0.75 * v->point->X + 0.25 * (b_sum_x / num_b);
+			vp->Y = 0.75 * v->point->Y + 0.25 * (b_sum_y / num_b);
+			vp->Z = 0.75 * v->point->Z + 0.25 * (b_sum_z / num_b);
+		} else {
+			double n = v_info[i].valence;
+			if (n > 0) {
+				double f_avg_x = v_info[i].sum_face_x / n;
+				double f_avg_y = v_info[i].sum_face_y / n;
+				double f_avg_z = v_info[i].sum_face_z / n;
+
+				double e_avg_x = v_info[i].sum_edge_mid_x / n;
+				double e_avg_y = v_info[i].sum_edge_mid_y / n;
+				double e_avg_z = v_info[i].sum_edge_mid_z / n;
+
+				vp->X = (f_avg_x + 2.0 * e_avg_x + (n - 3.0) * v->point->X) / n;
+				vp->Y = (f_avg_y + 2.0 * e_avg_y + (n - 3.0) * v->point->Y) / n;
+				vp->Z = (f_avg_z + 2.0 * e_avg_z + (n - 3.0) * v->point->Z) / n;
+			} else {
+				vp->X = v->point->X;
+				vp->Y = v->point->Y;
+				vp->Z = v->point->Z;
+			}
+		}
+		nv->point = vp;
+		new_vertex_vertices[i] = nv;
+	}
+
+	vector<vector<myVertex*>> new_polygons;
+	for (size_t i = 0; i < faces.size(); ++i) {
+		myFace* f = faces[i];
+		vector<myHalfedge*> face_hedges;
+		myHalfedge* start = f->adjacent_halfedge;
+		myHalfedge* h = start;
+		do {
+			face_hedges.push_back(h);
+			h = h->next;
+		} while (h != start);
+
+		int k = face_hedges.size();
+		for (int j = 0; j < k; ++j) {
+			myVertex* V_j = face_hedges[j]->source;
+			myHalfedge* h_out = face_hedges[j];
+			myHalfedge* h_in = face_hedges[(j - 1 + k) % k];
+
+			vector<myVertex*> quad(4);
+			quad[0] = new_vertex_vertices[V_j->index];
+			quad[1] = new_edge_vertices[h_out->index];
+			quad[2] = new_face_vertices[f->index];
+			quad[3] = new_edge_vertices[h_in->index];
+			new_polygons.push_back(quad);
+		}
+	}
+
+	vector<myVertex*> all_new_vertices;
+	all_new_vertices.reserve(new_vertex_vertices.size() + new_edge_vertices.size() + new_face_vertices.size());
+	for (size_t i = 0; i < new_vertex_vertices.size(); ++i) {
+		all_new_vertices.push_back(new_vertex_vertices[i]);
+	}
+	for (size_t i = 0; i < new_edge_vertices.size(); ++i) {
+		all_new_vertices.push_back(new_edge_vertices[i]);
+	}
+	for (size_t i = 0; i < new_face_vertices.size(); ++i) {
+		all_new_vertices.push_back(new_face_vertices[i]);
+	}
+
+	vector<myVertex*> old_vertices = vertices;
+	vertices = all_new_vertices;
+
+	rebuildMeshFromPolygons(this, new_polygons);
+
+	for (size_t i = 0; i < old_vertices.size(); ++i) {
+		if (old_vertices[i]) {
+			if (old_vertices[i]->point) delete old_vertices[i]->point;
+			delete old_vertices[i];
+		}
+	}
+
+	computeNormals();
 }
 
 
