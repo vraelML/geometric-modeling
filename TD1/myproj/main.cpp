@@ -157,6 +157,13 @@ void menu(int item)
 			makeBuffers(m);
 			break;
 	    }
+	case MENU_SIMPLIFY:
+		{
+			m->simplify();
+			m->computeNormals();
+			makeBuffers(m);
+			break;
+		}
 	case MENU_EXIT:
 		{
 			m->clear();

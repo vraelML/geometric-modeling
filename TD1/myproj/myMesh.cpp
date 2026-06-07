@@ -655,3 +655,62 @@ bool myMesh::triangulate(myFace *f)
 	return true;
 }
 
+void myMesh::simplify()
+{
+	if (vertices.size() < 4 || halfedges.empty()) return;
+
+	size_t target_count = (size_t)(vertices.size() * 0.9);
+	if (target_count >= vertices.size()) target_count = vertices.size() - 1;
+	if (target_count < 4) target_count = 4;
+
+	while (vertices.size() > target_count)
+	{
+		myHalfedge *best_edge = NULL;
+		double min_dist = 1e30;
+
+		for (unsigned int i = 0; i < halfedges.size(); i++) {
+			myHalfedge *e = halfedges[i];
+			if (e == NULL || e->source == NULL || e->twin == NULL || e->twin->source == NULL) continue;
+			double d = e->source->point->dist(*(e->twin->source->point));
+			if (d < min_dist) {
+				min_dist = d;
+				best_edge = e;
+			}
+		}
+
+		if (best_edge == NULL) break;
+
+		myVertex *v1 = best_edge->source;
+		myVertex *v2 = best_edge->twin->source;
+
+		v1->point->X = (v1->point->X + v2->point->X) / 2.0;
+		v1->point->Y = (v1->point->Y + v2->point->Y) / 2.0;
+		v1->point->Z = (v1->point->Z + v2->point->Z) / 2.0;
+
+		vector<vector<myVertex *>> new_polygons;
+		for (unsigned int i = 0; i < faces.size(); i++)
+		{
+			vector<myVertex *> face_verts = getFaceVertices(faces[i]);
+			vector<myVertex *> rep_verts;
+			for (unsigned int j = 0; j < face_verts.size(); j++)
+			{
+				myVertex *curr = (face_verts[j] == v2) ? v1 : face_verts[j];
+				if (rep_verts.empty() || rep_verts.back() != curr) {
+					rep_verts.push_back(curr);
+				}
+			}
+			if (rep_verts.size() > 1 && rep_verts.front() == rep_verts.back()) {
+				rep_verts.pop_back();
+			}
+			if (rep_verts.size() >= 3) {
+				new_polygons.push_back(rep_verts);
+			}
+		}
+
+		vertices.erase(std::remove(vertices.begin(), vertices.end(), v2), vertices.end());
+		delete v2;
+
+		rebuildMeshFromPolygons(this, new_polygons);
+	}
+}
+
