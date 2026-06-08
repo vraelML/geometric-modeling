@@ -714,3 +714,53 @@ void myMesh::simplify()
 	}
 }
 
+void myMesh::generateRevolution(const std::vector<myPoint3D>& profile, int slices)
+{
+	if (profile.empty() || slices < 3) return;
+
+	clear();
+
+	int K = profile.size();
+	vector<myVertex*> grid_verts;
+	grid_verts.reserve(K * slices);
+
+	for (int s = 0; s < slices; s++) {
+		double theta = (2.0 * 3.141592653589793 * s) / slices;
+		double cos_t = cos(theta);
+		double sin_t = sin(theta);
+		for (int i = 0; i < K; i++) {
+			myVertex *v = new myVertex();
+			v->point = new myPoint3D(profile[i].X * cos_t, profile[i].Y, profile[i].X * sin_t);
+			grid_verts.push_back(v);
+			vertices.push_back(v);
+		}
+	}
+
+	vector<vector<myVertex*>> new_polygons;
+	for (int s = 0; s < slices; s++) {
+		int next_s = (s + 1) % slices;
+		for (int i = 0; i < K - 1; i++) {
+			myVertex *v0 = grid_verts[s * K + i];
+			myVertex *v1 = grid_verts[s * K + i + 1];
+			myVertex *v2 = grid_verts[next_s * K + i + 1];
+			myVertex *v3 = grid_verts[next_s * K + i];
+
+			vector<myVertex*> poly;
+			myVertex* arr[] = { v0, v1, v2, v3 };
+			for (int j = 0; j < 4; j++) {
+				if (poly.empty() || poly.back() != arr[j]) {
+					poly.push_back(arr[j]);
+				}
+			}
+			if (poly.size() > 1 && poly.front() == poly.back()) {
+				poly.pop_back();
+			}
+			if (poly.size() >= 3) {
+				new_polygons.push_back(poly);
+			}
+		}
+	}
+
+	rebuildMeshFromPolygons(this, new_polygons);
+}
+

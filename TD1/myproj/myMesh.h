@@ -29,6 +29,7 @@ public:
 	bool triangulate(myFace *);
 
 	void simplify();
+	void generateRevolution(const std::vector<myPoint3D>& profile, int slices);
 
 	void clear();
 

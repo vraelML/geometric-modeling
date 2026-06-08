@@ -164,6 +164,22 @@ void menu(int item)
 			makeBuffers(m);
 			break;
 		}
+	case MENU_GENERATE:
+		{
+			vector<myPoint3D> profile;
+			profile.push_back(myPoint3D(0.0, -0.8, 0.0));
+			profile.push_back(myPoint3D(0.2, -0.8, 0.0));
+			profile.push_back(myPoint3D(0.2, -0.6, 0.0));
+			profile.push_back(myPoint3D(0.05, -0.6, 0.0));
+			profile.push_back(myPoint3D(0.05, 0.0, 0.0));
+			profile.push_back(myPoint3D(0.3, 0.4, 0.0));
+			profile.push_back(myPoint3D(0.4, 0.8, 0.0));
+
+			m->generateRevolution(profile, 32);
+			m->computeNormals();
+			makeBuffers(m);
+			break;
+		}
 	case MENU_EXIT:
 		{
 			m->clear();
